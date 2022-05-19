@@ -221,6 +221,7 @@ void A1RobotControl::static_walking_ctrl(A1CtrlStates &state, double t, double d
     else 
         {state.gait_sequence = GAIT_SEQUENCE::LF; }
 
+//
     Eigen::Vector2d res;
     Eigen::Vector2d x_0, y_0;
     Eigen::Vector2d x_f, y_f;
