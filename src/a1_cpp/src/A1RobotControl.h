@@ -41,6 +41,19 @@ public:
 
     void compute_joint_torques(A1CtrlStates &state);
 
+    Eigen::Vector2d move_COM_pos(A1CtrlStates &state,bool movestate);  
+    // movestate 1:right foot swing 0:left foot swing
+
+    void generate_footholds_ref(A1CtrlStates &state, double t, double dt);
+
+    void static_walking_ctrl(A1CtrlStates &state, double t, double dt);
+
+    void select_footholds(A1CtrlStates &state, double t, double dt);
+
+    void generate_swing_to_dest(A1CtrlStates &state, double t, double dt);
+
+    void compute_joint_torques_kin(A1CtrlStates &state);
+
     Eigen::Matrix<double, 3, NUM_LEG> compute_grf(A1CtrlStates &state, double dt);
 
     Eigen::Vector3d compute_walking_surface(A1CtrlStates &state);
@@ -107,6 +120,11 @@ private:
     MovingWindowFilter recent_contact_x_filter[NUM_LEG];
     MovingWindowFilter recent_contact_y_filter[NUM_LEG];
     MovingWindowFilter recent_contact_z_filter[NUM_LEG];
+
+    /* static walk variable */
+    CubicSplinesUtils cubicSplinesUtils;
+    
+
 };
 
 
