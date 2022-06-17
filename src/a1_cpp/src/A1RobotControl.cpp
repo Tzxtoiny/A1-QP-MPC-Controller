@@ -155,42 +155,50 @@ Eigen::Vector2d A1RobotControl::move_COM_pos(A1CtrlStates &state,bool movestate)
 
     if (movestate)   //move COM left
     {   
-        LH = state.foot_pos_world.block<3, 1>(0, 0);
-        LF = state.foot_pos_world.block<3, 1>(0, 2);
-        RF = state.foot_pos_target_world.block<3, 1>(0, 1);
+        LH = state.foot_pos_world.block<3, 1>(0, 2);
+        LF = state.foot_pos_world.block<3, 1>(0, 0);
+        RF = state.foot_pos_world.block<3, 1>(0, 1);
         RH = state.foot_pos_target_world.block<3, 1>(0, 3);
     }
     else      //move COM right
     {
-        LH = state.foot_pos_target_world.block<3, 1>(0, 0);
-        LF = state.foot_pos_target_world.block<3, 1>(0, 2);
+        LH = state.foot_pos_target_world.block<3, 1>(0, 2);
+        LF = state.foot_pos_world.block<3, 1>(0, 0);
         RF = state.foot_pos_world.block<3, 1>(0, 1);
         RH = state.foot_pos_world.block<3, 1>(0, 3);
     }
-
+    // for (size_t i = 0; i < 2; i++)
+    // {
+    //     std::cout<<"LH:"<<LH(i)<<","<<"LF:"<<LF(i)<<","<<"RH:"<<RH(i)<<","<<"RF:"<<RF(i)<<std::endl;
+    // }
+    // std::cout<<"------------------------------------------"<<std::endl;
+    
     //calculate the intersec point
     k1 = (RF(1) - LH(1))/(RF(0) - LH(0));
     k2 = (LF(1) - RH(1))/(LF(0) - RH(0));
     b1 = LH(1) - LH(0)*k1;
     b2 = LF(1) - LF(0)*k2;
-    x_inter = (b2*b1)/(k1-k2);
+    x_inter = (b2-b1)/(k1-k2);
     y_inter = k1*x_inter+b1;
 
     double delx,dely;
     if (movestate)   //move COM left
     {   
         region_center_x = (LF(0)+LH(0)+x_inter)/3;
-        region_center_y = (RF(1)+RH(1)+y_inter)/3;
+        region_center_y = (LF(1)+LH(1)+y_inter)/3;
     }
     else      //move COM right
     {
         region_center_x = (RF(0)+RH(0)+x_inter)/3;
-        region_center_y = (LF(1)+LH(1)+y_inter)/3;
+        region_center_y = (RF(1)+RH(1)+y_inter)/3;
     }
-    delx = region_center_x - x_COM;
-    dely = region_center_y - y_COM;
-    x_COM = x_inter + delx/3;
-    y_COM = y_inter + dely/3;
+    // std::cout<<"center x:"<<region_center_x<<","<<"center y:"<<region_center_y<<std::endl;
+    delx = region_center_x - x_inter;
+    dely = region_center_y - y_inter;
+    // x_COM = x_inter + delx/2;
+    // y_COM = y_inter + dely/2;
+    x_COM = x_inter + delx;
+    y_COM = y_inter + dely;
 
     COM_pos_world << x_COM,y_COM;
 
@@ -203,23 +211,35 @@ void A1RobotControl::static_walking_ctrl(A1CtrlStates &state, double t, double d
     state.counter_static_gait += state.counter_static_gait_speed;
     counter = state.counter_static_gait = std::fmod(state.counter_static_gait, state.counter_per_static_gait);
 
-    if (t < 14.0) // start to walk after 2 seconds
+    if (t < 7.0) // start to walk after 8 seconds
     {
         state.gait_sequence = GAIT_SEQUENCE::STAND;
         counter = state.counter_static_gait = 0.0;
     }
     else if (counter < state.counter_per_static_move_com)
-        {state.gait_sequence = GAIT_SEQUENCE::MOVE_COM_TO_LEFT; }
+        {state.gait_sequence = GAIT_SEQUENCE::MOVE_COM_TO_LEFT; 
+        // std::cout << "move com to left mode\n";
+        }
     else if (counter < state.counter_per_static_move_com + state.counter_per_static_swing)
-        {state.gait_sequence = GAIT_SEQUENCE::RH; }
+        {state.gait_sequence = GAIT_SEQUENCE::RH; 
+        // std::cout << "RH mode\n";
+        }
     else if (counter < state.counter_per_static_move_com + state.counter_per_static_swing * 2)
-        {state.gait_sequence = GAIT_SEQUENCE::RF; }
+        {state.gait_sequence = GAIT_SEQUENCE::RF; 
+        // std::cout << "RF mode\n";
+        }
     else if (counter < state.counter_per_static_move_com + state.counter_per_static_swing * 2 + state.counter_per_static_move_com)
-        {state.gait_sequence = GAIT_SEQUENCE::MOVE_COM_TO_RIGHT; }
+        {state.gait_sequence = GAIT_SEQUENCE::MOVE_COM_TO_RIGHT; 
+        // std::cout << "move com to right mode\n";
+        }
     else if (counter < state.counter_per_static_move_com + state.counter_per_static_swing * 3 + state.counter_per_static_move_com)
-        {state.gait_sequence = GAIT_SEQUENCE::LH; }
+        {state.gait_sequence = GAIT_SEQUENCE::LH;
+        //  std::cout << "LH mode\n";
+         }
     else 
-        {state.gait_sequence = GAIT_SEQUENCE::LF; }
+        {state.gait_sequence = GAIT_SEQUENCE::LF; 
+        // std::cout << "LF mode\n";
+        }
 
 //
     Eigen::Vector2d res;
@@ -251,6 +271,7 @@ void A1RobotControl::static_walking_ctrl(A1CtrlStates &state, double t, double d
         // step 2:
         
         COM_pos = move_COM_pos(state, 1);
+        // std::cout<< "move left:"<<  COM_pos(0)<<" ,"<<COM_pos(1)<<std::endl;
         //state.target_pos_CoM.segment<2>(0) = (state.foot_pos_world.block<2, 1>(0, 0) + state.foot_pos_world.block<2, 1>(0, 1) + state.foot_pos_world.block<2, 1>(0, 2)) / 3;
         //state.target_pos_CoM(1) += 0.015;
         state.target_pos_CoM(0) = COM_pos(0);
@@ -315,6 +336,7 @@ void A1RobotControl::static_walking_ctrl(A1CtrlStates &state, double t, double d
 
         // step 2:
         COM_pos = move_COM_pos(state, 0);
+        // std::cout<< "move left:"<<  COM_pos(0)<<" ,"<<COM_pos(1)<<std::endl;
         //state.target_pos_CoM.segment<2>(0) = (state.foot_pos_world.block<2, 1>(0, 0) + state.foot_pos_world.block<2, 1>(0, 1) + state.foot_pos_world.block<2, 1>(0, 3)) / 3;
         //state.target_pos_CoM(1) -= 0.015;
         state.target_pos_CoM(0) = COM_pos(0);
@@ -378,22 +400,11 @@ void A1RobotControl::static_walking_ctrl(A1CtrlStates &state, double t, double d
 void A1RobotControl::generate_footholds_ref(A1CtrlStates &state, double t, double dt) {
 
     double delta_x, delta_y;
-    delta_x = 0.05;
+    delta_x = 0.065;
     delta_y = 0.0;
-    if (delta_x < -FOOT_DELTA_X_LIMIT) {
-        delta_x = -FOOT_DELTA_X_LIMIT;
-    }
-    if (delta_x > FOOT_DELTA_X_LIMIT) {
-        delta_x = FOOT_DELTA_X_LIMIT;
-    }
-    if (delta_y < -FOOT_DELTA_Y_LIMIT) {
-        delta_y = -FOOT_DELTA_Y_LIMIT;
-    }
-    if (delta_y > FOOT_DELTA_Y_LIMIT) {
-        delta_y = FOOT_DELTA_Y_LIMIT;
-    }    
 
     state.footholds_rel = state.default_foot_pos;
+
     for (int i = 0; i < NUM_LEG; ++i)
     {
         state.footholds_rel(0, i) += delta_x;
@@ -401,40 +412,167 @@ void A1RobotControl::generate_footholds_ref(A1CtrlStates &state, double t, doubl
 
     }
 
+    // Step 1: generate default footholds w.r.t. world frame (state.foot_pos_target_world)
+    // calculate default pos w.r.t world frame
+    for (int i = 0; i < NUM_LEG; ++i)
+    {   
+
+        state.default_footholds_abs.block<3, 1>(0, i) = state.root_rot_mat * state.default_foot_pos.block<3, 1>(0, i);
+        state.default_footholds_world.block<3, 1>(0, i) = state.default_footholds_abs.block<3, 1>(0, i) + state.root_pos;
+    }
+    // Step 2: determine footholds in x-y plane w.r.t world frame
+    // state.foot_pos_target_world.block<3, 1>(0, i) = 3 by 1 target in world
+    for (int i = 0; i < NUM_LEG; ++i)
+    {   
+        if(i == int(state.gait_sequence)) 
+        {
+            // if (int(t * 1000) % 10 == 0) {
+
+            //     std::cout << "------------------" << std::endl;
+            //     std::cout << " leg " << i <<": " << "x=" <<  state.foot_pos_world(0, i) << "/" << state.foot_pos_target_world(0, i)
+            //     << " y=" << state.foot_pos_world(1, i) << "/" << state.foot_pos_target_world(1, i)
+            //     << " z=" << state.foot_pos_world(2, i) << "/" << state.foot_pos_target_world(2, i)
+            //     << std::endl;
+            // }
+            continue;
+        }
+        
+        state.foot_pos_target_world.block<3, 1>(0, i) = state.default_footholds_world.block<3, 1>(0, i);
+        state.foot_pos_target_world(0, i) += delta_x;
+        state.foot_pos_target_world(1, i) += delta_y;
+
+
+
+        Eigen::Vector2d temp_pos_recorded = state.foot_pos_target_world.block<2, 1>(0, i);
+
+        // define the feasible region
+        double upperBoundx, lowerBoundx;
+        double upperBoundy, lowerBoundy;
+
+        
+        upperBoundx = state.default_footholds_world(0, i) + FOOT_DELTA_X_LIMIT;
+        lowerBoundx = state.default_footholds_world(0, i) - 0.1 * FOOT_DELTA_X_LIMIT;
+
+        upperBoundy = state.default_footholds_world(1, i) + FOOT_DELTA_Y_LIMIT;
+        lowerBoundy = state.default_footholds_world(1, i) - FOOT_DELTA_Y_LIMIT;
+
+        if(i == 0 || i == 2)
+        {
+            lowerBoundy += 0.02;
+        }
+        else
+        {
+            upperBoundy -= 0.02;
+        }
+
+
+        // choose from list
+        double farestPile = -1e5;
+        for (auto it = state.record.begin(); it != state.record.end(); ++ it) {
+        Eigen::Vector3d pos_recorded = (*it).pos;
+
+            
+
+
+            if(pos_recorded[0] >= lowerBoundx && pos_recorded[0] <= upperBoundx && pos_recorded[1] >= lowerBoundy && pos_recorded[1] <= upperBoundy)
+            {
+                
+
+                if(pos_recorded[0] > farestPile)
+                {
+                    
+                    farestPile = pos_recorded[0];
+                    temp_pos_recorded = pos_recorded.segment<2>(0);
+
+                    if (i == 0 || i == 2)
+                    {
+                        temp_pos_recorded(1) += 0.02;
+                        temp_pos_recorded(0) -= 0.01;
+                    }
+
+                    if (i == 2 || i == 3)
+                    {
+                        temp_pos_recorded(0) -= 0.02;
+                    }
+
+                    
+                    // state.default_footholds_times ++ ;
+                    // if ((state.default_footholds_times > 4000)&&(i == 0 || i == 2) )
+                    // {
+                    //     state.default_footholds_times = 0;
+                    //     printf("--------------------------------------\n");
+                    //     printf("Gait sequence: ",state.gait_sequence);
+                    //     printf("choose meihuazhuang footholds! \n");
+                    // }
+                }
+                
+            
+            }
+            else
+            {
+                // state.default_footholds_times ++ ;
+                // if ((state.default_footholds_times > 4000)&&(i == 0 || i == 2) )
+                // {
+                //     state.default_footholds_times = 0;
+                //     printf("--------------------------------------\n");
+                //     printf("Gait sequence: ",state.gait_sequence);
+                //     printf("choose default footholds! \n");
+                // }
+                
+            }
+        }
+        
+        state.foot_pos_target_world.block<2, 1>(0, i) = temp_pos_recorded;
+
+    }
+    
+
+    for (int i = 0; i < NUM_LEG; ++i)
+    {   
+        Eigen::Vector2d deltaDistance = state.foot_pos_target_world.block<2, 1>(0, i) - state.default_footholds_world.block<2, 1>(0, i);
+
+        if(deltaDistance(0) > FOOT_DELTA_X_LIMIT)
+        {state.foot_pos_target_world(0, i) = state.default_footholds_world(0, i) + FOOT_DELTA_X_LIMIT;}
+        if(deltaDistance(0) < -FOOT_DELTA_X_LIMIT)
+        {state.foot_pos_target_world(0, i) = state.default_footholds_world(0, i) - FOOT_DELTA_X_LIMIT;}
+        
+        if(deltaDistance(1) > FOOT_DELTA_Y_LIMIT)
+        {state.foot_pos_target_world(1, i) = state.default_footholds_world(1, i) + FOOT_DELTA_Y_LIMIT;}
+        if(deltaDistance(1) < -FOOT_DELTA_Y_LIMIT)
+        {state.foot_pos_target_world(1, i) = state.default_footholds_world(1, i) - FOOT_DELTA_Y_LIMIT;}
+        
+    }
+ 
+ 
+    // Step 3: transform to the robot frame (state.foot_pos_target_rel)
+    for (int i = 0; i < NUM_LEG; ++i)
+    {   
+        state.foot_pos_target_abs.block<3, 1>(0, i) = state.foot_pos_target_world.block<3, 1>(0, i) - state.root_pos;
+        state.foot_pos_target_rel.block<3, 1>(0, i) = state.root_rot_mat.transpose() * state.foot_pos_target_abs.block<3, 1>(0, i);
+    }
+
 }
 
 
 void A1RobotControl::select_footholds(A1CtrlStates &state, double t, double dt) {
 
+
+
     generate_footholds_ref(state, t, dt);
-    Eigen::Matrix<double,3,NUM_LEG> footholds_rel;
-    footholds_rel = state.footholds_rel;
 
-    // double delta_x, delta_y;
-    // delta_x = 0.05;
-    // delta_y = 0.0;
+    // Eigen::Matrix<double,3,NUM_LEG> footholds_rel;
+    // footholds_rel = state.footholds_rel;
+    
 
-    // if (delta_x < -FOOT_DELTA_X_LIMIT) {
-    //     delta_x = -FOOT_DELTA_X_LIMIT;
-    // }
-    // if (delta_x > FOOT_DELTA_X_LIMIT) {
-    //     delta_x = FOOT_DELTA_X_LIMIT;
-    // }
-    // if (delta_y < -FOOT_DELTA_Y_LIMIT) {
-    //     delta_y = -FOOT_DELTA_Y_LIMIT;
-    // }
-    // if (delta_y > FOOT_DELTA_Y_LIMIT) {
-    //     delta_y = FOOT_DELTA_Y_LIMIT;
-    // }    
-
-    state.foot_pos_target_rel = state.default_foot_pos;
+    // state.foot_pos_target_rel = state.default_foot_pos;
     for (int i = 0; i < NUM_LEG; ++i)
     {
         // state.foot_pos_target_rel(0, i) += delta_x;
         // state.foot_pos_target_rel(1, i) += delta_y;
 
-        state.foot_pos_target_rel(0, i) = footholds_rel(0,i);
-        state.foot_pos_target_rel(1, i) = footholds_rel(1,i);
+        // state.foot_pos_target_rel(0, i) = footholds_rel(0,i);
+
+        // state.foot_pos_target_rel(1, i) = footholds_rel(1,i);
 
         state.foot_pos_target_abs.block<3, 1>(0, i) = state.root_rot_mat * state.foot_pos_target_rel.block<3, 1>(0, i);
         state.foot_pos_target_world.block<3, 1>(0, i) = state.foot_pos_target_abs.block<3, 1>(0, i) + state.root_pos;
@@ -850,7 +988,7 @@ Eigen::Matrix<double, 3, NUM_LEG> A1RobotControl::compute_grf(A1CtrlStates &stat
         std::chrono::duration<double, std::milli> ms_double_1 = t2 - t1;
         std::chrono::duration<double, std::milli> ms_double_2 = t3 - t2;
 
-        std::cout << "qp solver init time: " << ms_double_1.count() << "ms; solve time: " << ms_double_2.count() << "ms" << std::endl;
+        // std::cout << "qp solver init time: " << ms_double_1.count() << "ms; solve time: " << ms_double_2.count() << "ms" << std::endl;
 
         Eigen::VectorXd QPSolution = solver.getSolution(); //12x1
         for (int i = 0; i < NUM_LEG; ++i) {
